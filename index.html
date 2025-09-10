@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreakFlow — Gamified Planner</title>
+<style>
+:root{
+  --bg:#f7f7fb; --sidebar:#fff; --card:#fff; --muted:#eef0f3;
+  --text:#0f1222; --sub:#4b5563;
+  --brand:#10b981; --brand2:#2563eb;
+  --high:#dc2626; --medium:#d97706; --low:#059669;
+}
+[data-theme="dark"]{
+  --bg:#0b0c10; --sidebar:#111218; --card:#1a1c23; --muted:#22252e;
+  --text:#f5f5f7; --sub:#a8acb8;
+  --brand:#6ee7b7; --brand2:#60a5fa;
+  --high:#f87171; --medium:#fbbf24; --low:#10b981;
+}
+*{box-sizing:border-box;transition:all .25s ease;}
+body{margin:0;font-family:system-ui,Segoe UI,Arial;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;}
+/* Sidebar */
+.sidebar{width:240px;background:var(--sidebar);padding:20px;display:flex;flex-direction:column;gap:20px;border-right:1px solid var(--muted);}
+.logo{font-size:20px;font-weight:900;background:linear-gradient(135deg,var(--brand),var(--brand2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.nav button{all:unset;cursor:pointer;display:block;padding:10px 14px;margin-bottom:6px;border-radius:10px;color:var(--text);}
+.nav button.active,.nav button:hover{background:var(--muted);}
+/* Main */
+.main{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;}
+.card{background:var(--card);padding:16px;border-radius:14px;box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.btn{padding:8px 14px;border:none;border-radius:10px;cursor:pointer;font-weight:600;}
+.btn.brand{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;}
+.btn.warn{background:var(--high);color:#fff;}
+.btn.ghost{background:transparent;border:1px solid var(--sub);color:var(--text);}
+.input,select,textarea{width:100%;padding:10px;margin-bottom:8px;border-radius:10px;border:1px solid var(--muted);background:var(--card);color:var(--text);}
+.task{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--muted);padding:12px;border-radius:12px;margin-bottom:8px;}
+.task.done{opacity:.7;text-decoration:line-through;}
+.tag{font-size:11px;padding:2px 6px;border-radius:6px;background:var(--muted);margin-left:6px;}
+.banner{padding:10px;border-radius:10px;text-align:center;background:linear-gradient(90deg,var(--brand),var(--brand2));color:#fff;font-weight:600;display:none;}
+.banner.show{display:block;}
+/* Calendar */
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;}
+.calendar div{padding:6px;border-radius:6px;cursor:pointer;}
+.calendar .today{background:var(--brand);color:#fff;}
+</style>
+</head>
+<body data-theme="light">
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">🔥 StreakFlow</div>
+  <div class="nav">
+    <button class="active" data-view="dashboard">📊 Dashboard</button>
+    <button data-view="tasks">✅ Tasks</button>
+    <button data-view="calendar">📅 Calendar</button>
+    <button data-view="friends">👥 Friends</button>
+    <button data-view="stats">📈 Stats</button>
+  </div>
+  <div style="margin-top:auto;display:grid;gap:8px;">
+    <button id="themeBtn" class="btn ghost">🌗 Toggle Theme</button>
+    <button id="exportBtn" class="btn ghost">⬇️ Export</button>
+    <button id="importBtn" class="btn ghost">⬆️ Import</button>
+    <button id="resetBtn" class="btn warn">🧹 Reset</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div id="banner" class="banner"></div>
+
+  <!-- Login -->
+  <div id="loginCard" class="card">
+    <h3>Login</h3>
+    <input id="loginUser" class="input" placeholder="Username">
+    <input id="loginPass" class="input" type="password" placeholder="Password">
+    <button id="loginBtn" class="btn brand">Login</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="card view">
+    <h3>Dashboard</h3>
+    <div id="progress"></div>
+    <div id="rewards"></div>
+    <div id="streakInfo"></div>
+  </div>
+
+  <!-- Tasks -->
+  <div id="tasks" class="card view" style="display:none">
+    <h3>Add Task</h3>
+    <input id="title" class="input" placeholder="Task title">
+    <textarea id="desc" class="input" placeholder="Description (Markdown supported)"></textarea>
+    <input id="duration" class="input" type="number" placeholder="Duration (hrs)">
+    <input id="dueDate" class="input" type="datetime-local">
+    <select id="priority">
+      <option value="low">Low</option>
+      <option value="medium">Medium</option>
+      <option value="high">High</option>
+    </select>
+    <button id="addTask" class="btn brand">➕ Add Task</button>
+    <h3 style="margin-top:20px">Your Tasks</h3>
+    <div id="taskList"></div>
+  </div>
+
+  <!-- Calendar -->
+  <div id="calendar" class="card view" style="display:none">
+    <h3>Calendar</h3>
+    <div id="calendarGrid" class="calendar"></div>
+    <h4 style="margin-top:10px">Tasks on selected day</h4>
+    <div id="calendarTasks"></div>
+  </div>
+
+  <!-- Friends -->
+  <div id="friends" class="card view" style="display:none">
+    <h3>Friends & Leaderboard</h3>
+    <input id="friendInput" class="input" placeholder="Add friend">
+    <button id="addFriendBtn" class="btn brand">➕ Add Friend</button>
+    <div id="friendsList"></div>
+    <h4>Leaderboard</h4>
+    <div id="leaderboard"></div>
+  </div>
+
+  <!-- Stats -->
+  <div id="stats" class="card view" style="display:none">
+    <h3>Stats</h3>
+    <div id="statsContent"></div>
+  </div>
+</div>
+
+<script>
+// --- Data Store ---
+let currentUser=null;
+let data=JSON.parse(localStorage.getItem("sf_data")||'{"users":{}}');
+function save(){localStorage.setItem("sf_data",JSON.stringify(data));}
+
+// --- Banner ---
+function banner(msg){const b=document.getElementById("banner");b.textContent=msg;b.classList.add("show");setTimeout(()=>b.classList.remove("show"),2500);}
+
+// --- Login ---
+document.getElementById("loginBtn").onclick=()=>{
+  const u=document.getElementById("loginUser").value.trim();
+  const p=document.getElementById("loginPass").value;
+  if(!u||!p){alert("Enter username & password");return;}
+  if(!data.users[u]) data.users[u]={pass:p,tasks:[],friends:[],points:0};
+  if(data.users[u].pass!==p){alert("Wrong password");return;}
+  currentUser=u; save(); banner(`Welcome ${u}`); document.getElementById("loginCard").style.display="none"; renderAll();
+};
+
+// --- Theme ---
+document.getElementById("themeBtn").onclick=()=>{
+  document.body.dataset.theme=document.body.dataset.theme==="dark"?"light":"dark";
+};
+
+// --- Reset ---
+document.getElementById("resetBtn").onclick=()=>{
+  if(confirm("Clear all data?")){localStorage.clear();location.reload();}
+};
+
+// --- Export/Import ---
+document.getElementById("exportBtn").onclick=()=>{
+  navigator.clipboard.writeText(JSON.stringify(data)); banner("Data copied to clipboard");
+};
+document.getElementById("importBtn").onclick=()=>{
+  const json=prompt("Paste data JSON"); if(!json) return;
+  try{data=JSON.parse(json); save(); banner("Data imported"); renderAll();}catch{alert("Invalid JSON");}
+};
+
+// --- Nav ---
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  document.querySelectorAll(".view").forEach(v=>v.style.display="none");
+  document.getElementById(b.dataset.view).style.display="block";
+  renderAll(); // ensure stats & others sync on view change
+});
+
+// --- Add Task ---
+document.getElementById("addTask").onclick=()=>{
+  if(!currentUser){alert("Login first");return;}
+  const t=document.getElementById("title").value.trim();
+  const d=document.getElementById("desc").value.trim();
+  const dur=parseFloat(document.getElementById("duration").value);
+  const due=document.getElementById("dueDate").value;
+  const pri=document.getElementById("priority").value;
+  if(!t||!due){alert("Fill all fields");return;}
+  data.users[currentUser].tasks.push({title:t,desc:d,duration:dur,due,priority:pri,done:false,streak:0});
+  save(); renderAll();
+};
+
+// --- Render Tasks ---
+function renderTasks(){
+  const list=document.getElementById("taskList"); list.innerHTML="";
+  let done=0;
+  data.users[currentUser].tasks.forEach((task,i)=>{
+    const div=document.createElement("div");
+    div.className="task"+(task.done?" done":"");
+    div.innerHTML=`<span>${task.title} <span class="tag">${task.priority}</span></span>
+      <button class="btn ghost">${task.done?"Undo":"Done"}</button>`;
+    div.querySelector("button").onclick=()=>{
+      task.done=!task.done;
+      if(task.done){task.streak++; data.users[currentUser].points+=10;} 
+      else{task.streak=0; data.users[currentUser].points=Math.max(0,data.users[currentUser].points-5);}
+      save(); renderAll();
+    };
+    list.appendChild(div); if(task.done) done++;
+  });
+  document.getElementById("progress").textContent=`Progress: ${done}/${data.users[currentUser].tasks.length} tasks`;
+}
+
+// --- Dashboard ---
+function renderDashboard(){
+  if(!currentUser) return;
+  const u=data.users[currentUser];
+  document.getElementById("rewards").textContent=`⭐ Points: ${u.points}`;
+  const longest=Math.max(0,...u.tasks.map(t=>t.streak));
+  document.getElementById("streakInfo").textContent=`🔥 Longest streak: ${longest} days`;
+}
+
+// --- Friends & Leaderboard ---
+document.getElementById("addFriendBtn").onclick=()=>{
+  const f=document.getElementById("friendInput").value.trim();
+  if(!f||!data.users[f]||f===currentUser){alert("Invalid friend");return;}
+  if(!data.users[currentUser].friends.includes(f)) data.users[currentUser].friends.push(f);
+  save(); renderFriends();
+};
+function renderFriends(){
+  const fl=document.getElementById("friendsList"); fl.innerHTML="";
+  data.users[currentUser].friends.forEach(f=>{
+    fl.innerHTML+=`<div>${f} • ${data.users[f].points} pts</div>`;
+  });
+  const lb=document.getElementById("leaderboard"); lb.innerHTML="";
+  Object.keys(data.users).sort((a,b)=>data.users[b].points-data.users[a].points).forEach(u=>{
+    lb.innerHTML+=`<div>${u}: ${data.users[u].points} pts</div>`;
+  });
+}
+
+// --- Calendar ---
+function renderCalendar(){
+  const grid=document.getElementById("calendarGrid"); grid.innerHTML="";
+  const now=new Date(),year=now.getFullYear(),month=now.getMonth();
+  const first=new Date(year,month,1).getDay();
+  const days=new Date(year,month+1,0).getDate();
+  for(let i=0;i<first;i++) grid.innerHTML+="<div></div>";
+  for(let d=1;d<=days;d++){
+    const cell=document.createElement("div"); cell.textContent=d;
+    if(d===now.getDate()) cell.classList.add("today");
+    cell.onclick=()=>renderCalendarTasks(year,month,d);
+    grid.appendChild(cell);
+  }
+}
+function renderCalendarTasks(y,m,d){
+  const cont=document.getElementById("calendarTasks"); cont.innerHTML="";
+  const dateStr=new Date(y,m,d).toISOString().slice(0,10);
+  const tasks=data.users[currentUser].tasks.filter(t=>t.due.startsWith(dateStr));
+  if(tasks.length===0){cont.textContent="No tasks";return;}
+  tasks.forEach(t=>cont.innerHTML+=`<div class="task${t.done?" done":""}">${t.title} (${t.priority})</div>`);
+}
+
+// --- Stats ---
+function renderStats(){
+  const sc=document.getElementById("statsContent"); sc.innerHTML="";
+  const u=data.users[currentUser];
+  const total=u.tasks.length;
+  const completed=u.tasks.filter(t=>t.done).length;
+  const longest=Math.max(0,...u.tasks.map(t=>t.streak));
+  sc.innerHTML=`<p>Total tasks: ${total}</p>
+                <p>Completed: ${completed}</p>
+                <p>⭐ Points: ${u.points}</p>
+                <p>🔥 Longest streak: ${longest} days</p>`;
+}
+
+// --- Render All ---
+function renderAll(){
+  if(!currentUser) return;
+  renderDashboard(); renderTasks(); renderFriends(); renderCalendar(); renderStats();
+}
+</script>
+</body>
+</html>
+
